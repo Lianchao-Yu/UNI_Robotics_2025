@@ -100,7 +100,7 @@ void processGamepad(ControllerPtr ctl) {
 void processControllers() {
 
   // While trying to process the controller, if it doesn't get the proper data, makes this false
-  controllerConnected = false;
+  control.connected;
 
   for (auto myController : myControllers) {
 
@@ -118,10 +118,11 @@ void processControllers() {
 
     } else {  // Regular run
       processGamepad(myController);
-      controllerConnected = true;
+      control.connected = true;
     }
   }
 }
+
 
 /**
  * Safety loop to check if stuff is still connected
@@ -130,7 +131,7 @@ void processControllers() {
 bool safetyLoop() {
 
   // If the controller is connected
-  if (!controllerConnected) {
+  if (!control.connected) {
     Serial.println("ALERT: PS4 Controller disconnected");
     return false;
   }
@@ -150,55 +151,51 @@ bool safetyLoop() {
  * y - Forward/Reverse
  * x - Left/Right
  * rot - Rotation
+ * Stores data in desiredPowers[] array
  */
 void calculateMech(int y, int x, int rot) {
 
+  // Applies deadzones to inputs
+  if (y > -contDeadzone && y < contDeadzone) {
+    y = 0;
+  }
+  if (x > -contDeadzone && x < contDeadzone) {
+    x = 0;
+  }
+  if (rot > -contDeadzone && rot < contDeadzone) {
+    rot = 0;
+  }
+
   // Mechanum calculation matrix
-  desiredPowers[0] = x + y + rot;
-  desiredPowers[1] = x + y + rot;
-  desiredPowers[2] = x + y + rot;
-  desiredPowers[3] = x + y + rot;
+  desiredPowers[0] = (x + y + rot) * 8;
+  desiredPowers[1] = (x + y + rot) * 8;
+  desiredPowers[2] = (x + y + rot) * 8;
+  desiredPowers[3] = (x + y + rot) * 8;
 }
 
 
 void drive(int powFL, int powBL, int powBR, int powFR) {
 
-  // FLMo
-  if (powFL >= 0) {
-    motorDriver.ForwardM1(driver1Addr, powFL);
-  } else if (powFL < 0) {
-    motorDriver.BackwardM1(driver1Addr, powFL);
-  } else {
-  }
+  // FLMotor
+  motorDriver.SpeedM1(driver1Addr, powFL);
 
-  if (powBL >= 0) {
-    motorDriver.ForwardM2(driver1Addr, powBL);
-  } else if (powBL < 0) {
-    motorDriver.BackwardM2(driver1Addr, powBL);
-  } else {
-  }
+  //BLMotor
+  motorDriver.SpeedM2(driver1Addr, powBL);
 
+  // BRMotor
+  motorDriver.SpeedM1(driver2Addr, powBR);
 
-  if (powBR >= 0) {
-    motorDriver.ForwardM1(driver2Addr, powBR);
-  } else if (powBR < 0) {
-    motorDriver.BackwardM1(driver2Addr, powBR);
-  } else {
-  }
-
-  if (powFR >= 0) {
-    motorDriver.ForwardM2(driver2Addr, powFR);
-  } else if (powFR < 0) {
-    motorDriver.BackwardM2(driver2Addr, powFR);
-  } else {
-  }
+  // FRMotor
+  motorDriver.SpeedM2(driver2Addr, powFR);
 }
 
 
 // Arduino setup function. Runs in CPU 1
 void setup() {
+
   Serial.begin(115200);
-  Serial2.begin(38400, 12, 13);  // RoboClaw Serial bus
+  motorDriver.begin(38400);  // Initialize the motor drivers
+
   Serial.printf("Firmware: %s\n", BP32.firmwareVersion());
   const uint8_t* addr = BP32.localBdAddress();
   Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
@@ -220,7 +217,7 @@ void setup() {
   // - Second one, which is a "virtual device", is a mouse.
   // By default, it is disabled.
   BP32.enableVirtualDevice(false);
-*/
+  */
 
 
   /*
@@ -231,51 +228,41 @@ void setup() {
     Serial.println(F("2.Please recheck the connection."));
     delay(100);
   }
-*/
-
-  // Initialize the motor drivers
-  motorDriver.begin(38400);
+  */
 }
+
 
 // Arduino loop function. Runs in CPU 1.
 void loop() {
-  // This call fetches all the controllers' data.
-  // Call this function in your main loop.
-  if (BP32.update()) {
+
+  // Updates the controller once a timer is done.
+  if (millis() - prevTime >= 15) {
+    BP32.update();
     processControllers();
+    prevTime = millis();
   }
 
+  /*
   if (!safetyLoop()) {
     for (int i = 0; i < 4; i++) {
       motorPowers[i] = 0;
     }
   }
+  */
 
   // Calculate mechanum wheel powers from xy controlls
-  calculateMech(control.LY, control.LX, control.RX);
+  //calculateMech(control.LY, control.LX, control.RX);
 
-  if (control.dpad_up) {
-    Serial.println("DPAD UP");
-  }
-  if (control.dpad_down) {
-    Serial.println("DPAD down");
-  }
-  if (control.dpad_left) {
-    Serial.println("DPAD left");
-  }
-  if (control.dpad_right) {
-    Serial.println("DPAD right");
+  // Send calculated powers to the motor
+  //drive(desiredPowers[0], desiredPowers[1], desiredPowers[2], desiredPowers[3]);
+
+
+  if (control.LX < 16 || control.LX > -16) {
+    motorDriver.SpeedM1(driver2Addr, control.LX * 7);
+  } else {
+    motorDriver.SpeedM1(driver2Addr, control.LX * 7);
   }
 
-  motorDriver.ReadEncM1(driver1Addr);
 
-
-  // The main loop must have some kind of "yield to lower priority task" event.
-  // Otherwise, the watchdog will get triggered.
-  // If your main loop doesn't have one, just add a simple `vTaskDelay(1)`.
-  // Detailed info here:
-  // https://stackoverflow.com/questions/66278271/task-watchdog-got-triggered-the-tasks-did-not-reset-the-watchdog-in-time
-
-  //     vTaskDelay(1);
-  delay(150);
+  delay(25);
 }

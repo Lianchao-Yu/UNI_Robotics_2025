@@ -1,3 +1,4 @@
+#include <sys/_types.h>
 #ifndef main
 #define main
 
@@ -7,9 +8,12 @@
 
 #include "HUSKYLENS/HUSKYLENS.h"  // Camera
 
+#define SetWORDval(arg) (uint8_t)(((uint16_t)arg)>>8),(uint8_t)arg
 
 #define driver1Addr 0x80
 #define driver2Addr 0x81
+
+#define contDeadzone 16
 
 
 ControllerPtr myControllers[BP32_MAX_GAMEPADS];
@@ -57,6 +61,9 @@ struct ControllerButtons {
     dpad_down,
     dpad_left,
     dpad_right;
+
+    bool
+    connected = false;
 };
 
 /**
@@ -69,8 +76,7 @@ struct ControllerButtons {
 */
 int8_t desiredPowers[4] = { 0, 0, 0, 0 };
 
-bool controllerConnected = false;
-
+unsigned long prevTime = 0;
 
 void onConnectedController(ControllerPtr ctl);
 void onDisconnectedController(ControllerPtr ctl);
