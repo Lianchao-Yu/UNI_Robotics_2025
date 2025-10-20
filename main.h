@@ -1,12 +1,12 @@
-#include <sys/_types.h>
+
 #ifndef main
 #define main
 
 #include <Bluepad32.h>
 #include <sys/_stdint.h>
 #include <RoboClaw.h>
-
 #include "HUSKYLENS/HUSKYLENS.h"  // Camera
+#include <Wire.h>
 
 #define SetWORDval(arg) (uint8_t)(((uint16_t)arg)>>8),(uint8_t)arg
 
@@ -39,7 +39,7 @@ byte motorPins[4] = { 0, 1, 2, 3 };
  * 2 - BRMotor
  * 3 - FRMotor
 */
-int8_t motorPowers[4] = { 0, 0, 0, 0 };
+int16_t motorPowers[4] = { 0, 0, 0, 0 };
 
 
 // Easy way to reach the controller values

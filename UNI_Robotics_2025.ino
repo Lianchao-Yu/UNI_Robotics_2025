@@ -1,4 +1,6 @@
 #include "main.h"
+/////////////////////////////////////////////////////////////////////////overall test/////////////////////
+
 
 ControllerButtons control;
 
@@ -74,9 +76,9 @@ void processGamepad(ControllerPtr ctl) {
   //ctl->setColorLED(0, 255, 0);
 
   control.LX = ctl->axisX();
-  control.LY = ctl->axisY();
+  control.LY = -ctl->axisY();
   control.RX = ctl->axisRX();
-  control.RY = ctl->axisRY();
+  control.RY = -ctl->axisRY();
 
   control.cross = ctl->a();
   control.circle = ctl->b();
@@ -100,7 +102,7 @@ void processGamepad(ControllerPtr ctl) {
 void processControllers() {
 
   // While trying to process the controller, if it doesn't get the proper data, makes this false
-  control.connected;
+  control.connected = false;
 
   for (auto myController : myControllers) {
 
@@ -110,11 +112,12 @@ void processControllers() {
     } else if (!myController->isConnected()) {  // No Controller connected
       Serial.println("ERROR: Controller NOT Connected");
 
-    } else if (!myController->hasData()) {  // No data
-      Serial.println("ERROR: Controller has no Data");
-
     } else if (!myController->isGamepad()) {  // Not a supported gamepad
       Serial.println("ERROR: Controller is NOT a Gamepad");
+
+    } else if (!myController->hasData()) {  // No data
+      Serial.println("ERROR: Controller has no Data");
+      control.connected = true;
 
     } else {  // Regular run
       processGamepad(myController);
@@ -167,14 +170,14 @@ void calculateMech(int y, int x, int rot) {
   }
 
   // Mechanum calculation matrix
-  desiredPowers[0] = (x + y + rot) * 8;
-  desiredPowers[1] = (x + y + rot) * 8;
-  desiredPowers[2] = (x + y + rot) * 8;
-  desiredPowers[3] = (x + y + rot) * 8;
+  desiredPowers[0] = (x + y + rot) * 7;
+  desiredPowers[1] = (x + y + rot) * 7;
+  desiredPowers[2] = (x + y + rot) * 7;
+  desiredPowers[3] = (x + y + rot) * 7;
 }
 
 
-void drive(int powFL, int powBL, int powBR, int powFR) {
+void drive(int16_t powFL, int16_t powBL, int16_t powBR, int16_t powFR) {
 
   // FLMotor
   motorDriver.SpeedM1(driver1Addr, powFL);
@@ -242,6 +245,16 @@ void loop() {
     prevTime = millis();
   }
 
+
+  // Calculate mechanum wheel powers from xy controlls
+  calculateMech(control.LY, control.LX, control.RX);
+
+  // Send calculated powers to the motor
+  drive(desiredPowers[0], desiredPowers[1], desiredPowers[2], desiredPowers[3]);
+
+  Serial.printf("LY: %d, LX: %d, RX: %d, RY: %d", control.LY, control.LX, control.RX, control.RY);
+  Serial.println();
+
   /*
   if (!safetyLoop()) {
     for (int i = 0; i < 4; i++) {
@@ -249,19 +262,6 @@ void loop() {
     }
   }
   */
-
-  // Calculate mechanum wheel powers from xy controlls
-  //calculateMech(control.LY, control.LX, control.RX);
-
-  // Send calculated powers to the motor
-  //drive(desiredPowers[0], desiredPowers[1], desiredPowers[2], desiredPowers[3]);
-
-
-  if (control.LX < 16 || control.LX > -16) {
-    motorDriver.SpeedM1(driver2Addr, control.LX * 7);
-  } else {
-    motorDriver.SpeedM1(driver2Addr, control.LX * 7);
-  }
 
 
   delay(25);
